@@ -72,6 +72,17 @@ int zend_nocheq_recv_init_handler(zend_execute_data *execute_data) {
     param = EX_VAR_NUM(opline->result.var);
 
     if (args > EX_NUM_ARGS()) {
+#if PHP_VERSION_ID < 70300
+        ZVAL_COPY(param, EX_CONSTANT(opline->op2));
+        
+        if (Z_OPT_CONSTANT_P(param)) {
+            if (UNEXPECTED(zval_update_constant_ex(param, EX(func)->op_array.scope) != SUCCESS)) {
+                zval_ptr_dtor_nogc(param);
+                ZVAL_UNDEF(param);
+                ZEND_VM_CONTINUE();
+            }
+        }
+#else
         zval *def = RT_CONSTANT(opline, opline->op2);
 
         if (Z_OPT_TYPE_P(def) == IS_CONSTANT_AST) {
@@ -96,6 +107,7 @@ int zend_nocheq_recv_init_handler(zend_execute_data *execute_data) {
         } else {
             ZVAL_COPY(param, def);
         }
+#endif
     }
 
     ZEND_VM_NEXT(0, 1);
@@ -160,7 +172,7 @@ int zend_nocheq_verify_return_handler(zend_execute_data *execute_data) {
 	info = EX(func)->common.arg_info - 1;
 	ref = 
         val = 
-            RT_CONSTANT(opline, opline->op1);
+            EX_VAR(opline->op1.var);
 
 	if (IS_CONST == IS_CONST) {
 		ZVAL_COPY(
