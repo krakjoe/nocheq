@@ -152,8 +152,11 @@ int zend_nocheq_recv_variadic_handler(zend_execute_data *execute_data) {
         zval *param;
 
         array_init_size(params, count - args + 1);
+#if PHP_VERSION_ID >= 70300
         zend_hash_real_init_packed(Z_ARRVAL_P(params));
-
+#else
+        zend_hash_real_init(Z_ARRVAL_P(params), 1);
+#endif
 		ZEND_HASH_FILL_PACKED(Z_ARRVAL_P(params)) {
 			param = EX_VAR_NUM(ops->last_var + ops->T);
 			do {
