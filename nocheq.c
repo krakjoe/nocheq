@@ -53,22 +53,31 @@ static zend_always_inline zval* zend_vm_get_zval(
 
 static zend_always_inline zend_bool zend_nocheq_namespace_check(zend_op_array *ops) {
     zend_bool *cache, result;
+    zend_string *ns;
 
     if (NULL == zend_nocheq_namespace) {
         return 1;
     }
 
-    if (NULL == ops->function_name) {
-        return 1;
+    if (UNEXPECTED((ops->fn_flags & ZEND_ACC_CLOSURE))) {
+        if (NULL == ops->scope) {
+            return 1;
+        }
+        ns = ops->scope->name;
+    } else {
+        if (NULL == ops->function_name) {
+            return 1;
+        }
+        ns = ops->function_name;
     }
 
-    if ((cache = zend_hash_find_ptr(&zend_nocheq_namespace_cache, ops->function_name))) {
+    if ((cache = zend_hash_find_ptr(&zend_nocheq_namespace_cache, ns))) {
         return *cache;
     }
 
     result = zend_binary_strncasecmp(
-                ZSTR_VAL(ops->function_name),
-                ZSTR_LEN(ops->function_name),
+                ZSTR_VAL(ns),
+                ZSTR_LEN(ns),
                 ZSTR_VAL(zend_nocheq_namespace),
                 ZSTR_LEN(zend_nocheq_namespace),
                 ZSTR_LEN(zend_nocheq_namespace)) == SUCCESS;
