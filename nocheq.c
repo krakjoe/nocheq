@@ -330,6 +330,8 @@ int zend_nocheq_verify_return_handler(zend_execute_data *execute_data) {
     ZEND_VM_NEXT();
 }
 
+/* {{{ PHP_MSHUTDOWN_FUNCTION
+ */
 PHP_MINIT_FUNCTION(nocheq)
 {
     zend_vm_recv_handler =
@@ -356,7 +358,10 @@ PHP_MINIT_FUNCTION(nocheq)
 
     return SUCCESS;
 }
+/* }}} */
 
+/* {{{ PHP_MSHUTDOWN_FUNCTION
+ */
 PHP_MSHUTDOWN_FUNCTION(nocheq)
 {
     UNREGISTER_INI_ENTRIES();
@@ -375,6 +380,7 @@ PHP_MSHUTDOWN_FUNCTION(nocheq)
 
     return SUCCESS;
 }
+/* }}} */
 
 static void zend_nocheq_namespace_cache_free(zval *zv) {
     efree(Z_PTR_P(zv));
@@ -394,12 +400,15 @@ PHP_RINIT_FUNCTION(nocheq)
 }
 /* }}} */
 
+/* {{{ PHP_RSHUTDOWN_FUNCTION
+ */
 PHP_RSHUTDOWN_FUNCTION(nocheq)
 {
     zend_hash_destroy(&zend_nocheq_namespace_cache);
 
     return SUCCESS;
 }
+/* }}} */
 
 /* {{{ PHP_MINFO_FUNCTION
  */
