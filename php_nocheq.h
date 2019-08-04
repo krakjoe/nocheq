@@ -22,7 +22,7 @@
 extern zend_module_entry nocheq_module_entry;
 # define phpext_nocheq_ptr &nocheq_module_entry
 
-# define PHP_NOCHEQ_VERSION "0.1.0"
+# define PHP_NOCHEQ_VERSION "0.0.1-dev"
 
 # if defined(ZTS) && defined(COMPILE_DL_NOCHEQ)
 ZEND_TSRMLS_CACHE_EXTERN()
