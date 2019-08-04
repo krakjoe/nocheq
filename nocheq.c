@@ -59,16 +59,18 @@ static zend_always_inline zend_bool zend_nocheq_namespace_check(zend_op_array *o
         return 1;
     }
 
-    if (UNEXPECTED((ops->fn_flags & ZEND_ACC_CLOSURE))) {
-        if (NULL == ops->scope) {
+    if (UNEXPECTED(NULL == ops->scope)) {
+        if (ops->fn_flags & ZEND_ACC_CLOSURE) {
             return 1;
         }
-        ns = ops->scope->name;
-    } else {
-        if (NULL == ops->function_name) {
-            return 1;
-        }
+
         ns = ops->function_name;
+
+        if (UNEXPECTED(NULL == ns)) {
+            return 1;
+        }
+    } else {
+        ns = ops->scope->name;
     }
 
     if ((cache = zend_hash_find_ptr(&zend_nocheq_namespace_cache, ns))) {
