@@ -1,0 +1,7 @@
+ARG_ENABLE('nocheq', 'nocheq support', 'no');
+
+if (PHP_NOCHEQ != 'no') {
+	AC_DEFINE('HAVE_NOCHEQ', 1, 'nocheq support enabled');
+
+	EXTENSION('nocheq', 'nocheq.c', null, '/DZEND_ENABLE_STATIC_TSRMLS_CACHE=1');
+}
