@@ -22,7 +22,7 @@ To install:
 
 Restrict nocheq to a namespace:
 
-    nocheq.namespace=\\Vendor\\Namespace
+    nocheq.namespace=Vendor\\Namespace
 
 It is probably necessary to restrict to your vendor namespace ...
 

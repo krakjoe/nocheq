@@ -58,17 +58,17 @@ static zend_always_inline zend_bool zend_nocheq_namespace_check(zend_op_array *o
         return 1;
     }
 
-    if (NULL == ops->scope) {
+    if (NULL == ops->function_name) {
         return 1;
     }
 
-    if ((cache = zend_hash_find_ptr(&zend_nocheq_namespace_cache, ops->scope->name))) {
+    if ((cache = zend_hash_find_ptr(&zend_nocheq_namespace_cache, ops->function_name))) {
         return *cache;
     }
 
-    result = zend_binary_strncmp(
-                ZSTR_VAL(ops->scope->name),
-                ZSTR_LEN(ops->scope->name),
+    result = zend_binary_strncasecmp(
+                ZSTR_VAL(ops->function_name),
+                ZSTR_LEN(ops->function_name),
                 ZSTR_VAL(zend_nocheq_namespace),
                 ZSTR_LEN(zend_nocheq_namespace),
                 ZSTR_LEN(zend_nocheq_namespace)) == SUCCESS;
@@ -76,7 +76,7 @@ static zend_always_inline zend_bool zend_nocheq_namespace_check(zend_op_array *o
     cache = (zend_bool*)
         zend_hash_add_mem(
             &zend_nocheq_namespace_cache,
-            ops->scope->name,
+            ops->function_name,
             &result, sizeof(zend_bool));
 
     return *cache;
@@ -139,6 +139,14 @@ int zend_nocheq_recv_init_handler(zend_execute_data *execute_data) {
     uint32_t args;
     zval     *param;
 
+    if (!zend_nocheq_namespace_check((zend_op_array*) EX(func))) {
+        if (UNEXPECTED(zend_vm_recv_init_handler)) {
+            return zend_vm_recv_init_handler(execute_data);
+        }
+
+        return ZEND_USER_OPCODE_DISPATCH;
+    }
+
     if (UNEXPECTED(!(EX(func)->common.fn_flags & ZEND_ACC_HAS_TYPE_HINTS))) {
         if (UNEXPECTED(zend_vm_recv_init_handler)) {
             return zend_vm_recv_init_handler(execute_data);
@@ -196,6 +204,14 @@ int zend_nocheq_recv_variadic_handler(zend_execute_data *execute_data) {
     zval     *params;
     zend_op_array *ops = (zend_op_array*) EX(func);
 
+    if (!zend_nocheq_namespace_check((zend_op_array*) EX(func))) {
+        if (UNEXPECTED(zend_vm_recv_variadic_handler)) {
+            return zend_vm_recv_variadic_handler(execute_data);
+        }
+
+        return ZEND_USER_OPCODE_DISPATCH;
+    }
+
     if (UNEXPECTED(!(ops->fn_flags & ZEND_ACC_HAS_TYPE_HINTS))) {
         if (UNEXPECTED(zend_vm_recv_variadic_handler)) {
             return zend_vm_recv_variadic_handler(execute_data);
@@ -238,6 +254,14 @@ int zend_nocheq_verify_return_handler(zend_execute_data *execute_data) {
 #if PHP_VERSION_ID < 80000
     zend_free_op free_op1;
 #endif
+
+    if (!zend_nocheq_namespace_check((zend_op_array*) EX(func))) {
+        if (UNEXPECTED(zend_vm_verify_return_handler)) {
+            return zend_vm_verify_return_handler(execute_data);
+        }
+
+        return ZEND_USER_OPCODE_DISPATCH;
+    }
 
     if (UNEXPECTED(!(EX(func)->common.fn_flags & ZEND_ACC_HAS_RETURN_TYPE))) {
         if (UNEXPECTED(zend_vm_verify_return_handler)) {
@@ -396,7 +420,7 @@ zend_module_entry nocheq_module_entry = {
 	PHP_MINIT(nocheq),
 	PHP_MSHUTDOWN(nocheq),
 	PHP_RINIT(nocheq),
-	NULL,
+	PHP_RSHUTDOWN(nocheq),
 	PHP_MINFO(nocheq),
 	PHP_NOCHEQ_VERSION,
 	STANDARD_MODULE_PROPERTIES
