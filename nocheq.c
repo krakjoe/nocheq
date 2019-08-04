@@ -29,6 +29,24 @@ static user_opcode_handler_t zend_vm_recv_variadic_handler;
 
 static user_opcode_handler_t zend_vm_verify_return_handler;
 
+static zend_always_inline zval* zend_vm_get_zval(
+        const zend_op *opline,
+        int op_type,
+        const znode_op *node,
+        const zend_execute_data *execute_data,
+#if PHP_VERSION_ID < 80000
+        zend_free_op *should_free,
+#endif
+        int type) {
+#if PHP_VERSION_ID >= 80000
+	return zend_get_zval_ptr(opline, op_type, node, execute_data, type);
+#elif PHP_VERSION_ID >= 70300
+	return zend_get_zval_ptr(opline, op_type, node, execute_data, should_free, type);
+#else
+	return zend_get_zval_ptr(op_type, node, execute_data, should_free, type);
+#endif
+}
+
 #define ZEND_VM_OPLINE              EX(opline)
 #define ZEND_VM_USE_OPLINE          const zend_op *opline = EX(opline)
 #define ZEND_VM_CONTINUE()          return ZEND_USER_OPCODE_CONTINUE
@@ -74,7 +92,7 @@ int zend_nocheq_recv_init_handler(zend_execute_data *execute_data) {
     if (args > EX_NUM_ARGS()) {
 #if PHP_VERSION_ID < 70300
         ZVAL_COPY(param, EX_CONSTANT(opline->op2));
-        
+
         if (Z_OPT_CONSTANT_P(param)) {
             if (UNEXPECTED(zval_update_constant_ex(param, EX(func)->op_array.scope) != SUCCESS)) {
                 zval_ptr_dtor_nogc(param);
@@ -91,7 +109,7 @@ int zend_nocheq_recv_init_handler(zend_execute_data *execute_data) {
             if (Z_TYPE_P(cache) != IS_UNDEF) {
                 ZVAL_COPY_VALUE(param, cache);
             } else {
-                
+
                 ZVAL_COPY(param, def);
 
                 if (UNEXPECTED(zval_update_constant_ex(param, EX(func)->op_array.scope) != SUCCESS)) {
@@ -154,6 +172,9 @@ int zend_nocheq_verify_return_handler(zend_execute_data *execute_data) {
     ZEND_VM_USE_OPLINE;
 	zval *ref, *val;
     zend_arg_info *info;
+#if PHP_VERSION_ID < 80000
+    zend_free_op free_op1;
+#endif
 
     if (UNEXPECTED(!(EX(func)->common.fn_flags & ZEND_ACC_HAS_RETURN_TYPE))) {
         if (UNEXPECTED(zend_vm_verify_return_handler)) {
@@ -170,22 +191,30 @@ int zend_nocheq_verify_return_handler(zend_execute_data *execute_data) {
     }
 
 	info = EX(func)->common.arg_info - 1;
-	ref = 
-        val = 
-            EX_VAR(opline->op1.var);
+	ref =
+        val =
+            zend_vm_get_zval(
+                opline,
+				opline->op1_type,
+				&opline->op1,
+				execute_data,
+#if PHP_VERSION_ID < 80000
+				&free_op1,
+#endif
+                BP_VAR_R);
 
-	if (IS_CONST == IS_CONST) {
+	if (opline->op1_type == IS_CONST) {
 		ZVAL_COPY(
             EX_VAR(opline->result.var), val);
-		ref = 
-            val = 
+		ref =
+            val =
                 EX_VAR(opline->result.var);
-	} else if (IS_CONST == IS_VAR) {
+	} else if (opline->op1_type == IS_VAR) {
 		if (UNEXPECTED(Z_TYPE_P(val) == IS_INDIRECT)) {
 			val = Z_INDIRECT_P(val);
 		}
 		ZVAL_DEREF(val);
-	} else if (IS_CONST == IS_CV) {
+	} else if (opline->op1_type == IS_CV) {
 		ZVAL_DEREF(val);
 	}
 
@@ -204,6 +233,12 @@ int zend_nocheq_verify_return_handler(zend_execute_data *execute_data) {
 		}
 		val = ref;
 	}
+
+#if PHP_VERSION_ID < 80000
+    if (free_op1) {
+        zval_ptr_dtor_nogc(free_op1);
+    }
+#endif
 
     ZEND_VM_NEXT(0, 1);
 }
