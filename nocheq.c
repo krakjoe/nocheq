@@ -47,31 +47,27 @@ static zend_always_inline zval* zend_vm_get_zval(
 #endif
 }
 
-#define ZEND_VM_OPLINE              EX(opline)
-#define ZEND_VM_USE_OPLINE          const zend_op *opline = EX(opline)
-#define ZEND_VM_CONTINUE()          return ZEND_USER_OPCODE_CONTINUE
-#define ZEND_VM_NEXT(e, n)          do { \
-	if (e) { \
-		ZEND_VM_OPLINE = EX(opline) + (n); \
-	} else { \
-		ZEND_VM_OPLINE = opline + (n); \
-	} \
-	\
+#define ZEND_VM_OPLINE     EX(opline)
+#define ZEND_VM_USE_OPLINE const zend_op *opline = EX(opline)
+#define ZEND_VM_CONTINUE() return ZEND_USER_OPCODE_CONTINUE
+#define ZEND_VM_NEXT()    do { \
+	ZEND_VM_OPLINE = \
+        ZEND_VM_OPLINE + 1; \
 	ZEND_VM_CONTINUE(); \
 } while(0)
 
 int zend_nocheq_recv_handler(zend_execute_data *execute_data) {
     ZEND_VM_USE_OPLINE;
 
-    if (opline->op1.num > EX_NUM_ARGS()) {
-        if (zend_vm_recv_handler) {
+    if (UNEXPECTED(opline->op1.num > EX_NUM_ARGS())) {
+        if (UNEXPECTED(zend_vm_recv_handler)) {
             return zend_vm_recv_handler(execute_data);
         }
 
         return ZEND_USER_OPCODE_DISPATCH;
     }
 
-    ZEND_VM_NEXT(0, 1);
+    ZEND_VM_NEXT();
 }
 
 int zend_nocheq_recv_init_handler(zend_execute_data *execute_data) {
@@ -87,7 +83,7 @@ int zend_nocheq_recv_init_handler(zend_execute_data *execute_data) {
     }
 
     args  = opline->op1.num;
-    param = EX_VAR_NUM(opline->result.var);
+    param = EX_VAR(opline->result.var);
 
     if (args > EX_NUM_ARGS()) {
 #if PHP_VERSION_ID < 70300
@@ -109,7 +105,6 @@ int zend_nocheq_recv_init_handler(zend_execute_data *execute_data) {
             if (Z_TYPE_P(cache) != IS_UNDEF) {
                 ZVAL_COPY_VALUE(param, cache);
             } else {
-
                 ZVAL_COPY(param, def);
 
                 if (UNEXPECTED(zval_update_constant_ex(param, EX(func)->op_array.scope) != SUCCESS)) {
@@ -128,7 +123,7 @@ int zend_nocheq_recv_init_handler(zend_execute_data *execute_data) {
 #endif
     }
 
-    ZEND_VM_NEXT(0, 1);
+    ZEND_VM_NEXT();
 }
 
 int zend_nocheq_recv_variadic_handler(zend_execute_data *execute_data) {
@@ -169,7 +164,7 @@ int zend_nocheq_recv_variadic_handler(zend_execute_data *execute_data) {
         ZVAL_EMPTY_ARRAY(params);
     }
 
-    ZEND_VM_NEXT(0, 1);
+    ZEND_VM_NEXT();
 }
 
 int zend_nocheq_verify_return_handler(zend_execute_data *execute_data) {
@@ -244,7 +239,7 @@ int zend_nocheq_verify_return_handler(zend_execute_data *execute_data) {
     }
 #endif
 
-    ZEND_VM_NEXT(0, 1);
+    ZEND_VM_NEXT();
 }
 
 PHP_MINIT_FUNCTION(nocheq)
