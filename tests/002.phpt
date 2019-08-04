@@ -1,12 +1,12 @@
 --TEST--
-Basic nocheq is working on parameters with default value
+Basic nocheq doesn't break parameters with default value
 --FILE--
 <?php
-function nocheq(int $arg = 5) {
+function nocheq(string $arg = 'string') {
     var_dump($arg);
 }
 
-nocheq("string");
+nocheq();
 ?>
 --EXPECT--
 string(6) "string"
