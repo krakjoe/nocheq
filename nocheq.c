@@ -135,8 +135,9 @@ int zend_nocheq_recv_variadic_handler(zend_execute_data *execute_data) {
     ZEND_VM_USE_OPLINE;
     uint32_t args, count;
     zval     *params;
+    zend_op_array *ops = (zend_op_array*) EX(func);
 
-    if (UNEXPECTED(!(EX(func)->common.fn_flags & ZEND_ACC_HAS_TYPE_HINTS))) {
+    if (UNEXPECTED(!(ops->fn_flags & ZEND_ACC_HAS_TYPE_HINTS))) {
         if (UNEXPECTED(zend_vm_recv_variadic_handler)) {
             return zend_vm_recv_variadic_handler(execute_data);
         }
@@ -145,7 +146,7 @@ int zend_nocheq_recv_variadic_handler(zend_execute_data *execute_data) {
 
     args   = opline->op1.num;
     count  = EX_NUM_ARGS();
-    params = EX_VAR(opline->op1.var);
+    params = EX_VAR(opline->result.var);
 
     if (args <= count) {
         zval *param;
@@ -154,7 +155,7 @@ int zend_nocheq_recv_variadic_handler(zend_execute_data *execute_data) {
         zend_hash_real_init_packed(Z_ARRVAL_P(params));
 
 		ZEND_HASH_FILL_PACKED(Z_ARRVAL_P(params)) {
-			param = EX_VAR_NUM(EX(func)->op_array.last_var + EX(func)->op_array.T);
+			param = EX_VAR_NUM(ops->last_var + ops->T);
 			do {
 				if (Z_OPT_REFCOUNTED_P(param)) Z_ADDREF_P(param);
 				ZEND_HASH_FILL_ADD(param);
