@@ -18,17 +18,9 @@ To install:
 
     extension=nocheq.so
 
-## configure nocheq
-
-Restrict nocheq to a namespace:
-
-    nocheq.namespace=Vendor\\Namespace
-
-It is probably necessary to restrict to your vendor namespace ...
-
 ### How it Works
 
-nocheq rewrites the instruction handlers for RECV and RETURN opcodes to avoid type checking.
+Well tested code may have type checking disabled in production, if it is developed and tested using strict type checking: nocheq rewrites the instruction handlers for RECV and RETURN, so that any code compiled with `declare(strict_types=1);` may avoid type checking in production.
 
 Simple.
 

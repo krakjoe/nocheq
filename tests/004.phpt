@@ -2,6 +2,8 @@
 Basic nocheq is working on variadics
 --FILE--
 <?php
+declare(strict_types=1);
+
 function nocheq(int ... $args) {
     var_dump(...$args);
 }
