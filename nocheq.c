@@ -57,7 +57,7 @@ static zend_always_inline zval* zend_vm_get_zval(
 	ZEND_VM_CONTINUE(); \
 } while(0)
 
-static zend_always_inline void zend_nocheq_vm_helper(zend_execute_data *execute_data, const zend_op_array *ops, const zend_op *opline, zval *var, int arg) {
+static zend_always_inline void zend_nocheq_vm_helper(zend_execute_data *execute_data, const zend_op_array *ops, zval *var, int arg) {
     uint32_t flag = (arg == -1) ?
         ZEND_ACC_HAS_RETURN_TYPE : ZEND_ACC_HAS_TYPE_HINTS;
 
@@ -97,7 +97,7 @@ int zend_nocheq_recv_handler(zend_execute_data *execute_data) {
         return ZEND_USER_OPCODE_DISPATCH;
     }
 
-    zend_nocheq_vm_helper(execute_data, ops, opline, EX_VAR(opline->result.var), opline->op1.num);
+    zend_nocheq_vm_helper(execute_data, ops, EX_VAR(opline->result.var), opline->op1.num);
 
     ZEND_VM_NEXT();
 }
@@ -195,7 +195,7 @@ int zend_nocheq_recv_variadic_handler(zend_execute_data *execute_data) {
 		ZEND_HASH_FILL_PACKED(Z_ARRVAL_P(params)) {
 			param = EX_VAR_NUM(ops->last_var + ops->T);
 			do {
-                zend_nocheq_vm_helper(execute_data, ops, opline, param, opline->op1.num);
+                zend_nocheq_vm_helper(execute_data, ops, param, opline->op1.num);
 				if (Z_OPT_REFCOUNTED_P(param)) Z_ADDREF_P(param);
 				ZEND_HASH_FILL_ADD(param);
 				param++;
@@ -251,7 +251,7 @@ int zend_nocheq_verify_return_handler(zend_execute_data *execute_data) {
 #endif
                 BP_VAR_R);
 
-    zend_nocheq_vm_helper(execute_data, ops, opline, val, -1);
+    zend_nocheq_vm_helper(execute_data, ops, val, -1);
 
 	if (opline->op1_type == IS_CONST) {
 		ZVAL_COPY(
