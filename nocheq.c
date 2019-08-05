@@ -204,13 +204,6 @@ int zend_nocheq_verify_return_handler(zend_execute_data *execute_data) {
     zend_free_op free_op1;
 #endif
 
-    if (UNEXPECTED(!(ops->fn_flags & ZEND_ACC_HAS_RETURN_TYPE))) {
-        if (UNEXPECTED(zend_vm_verify_return_handler)) {
-            return zend_vm_verify_return_handler(execute_data);
-        }
-        return ZEND_USER_OPCODE_DISPATCH;
-    }
-
     if (UNEXPECTED(opline->op1_type == IS_UNUSED)) {
         if (UNEXPECTED(zend_vm_verify_return_handler)) {
             return zend_vm_verify_return_handler(execute_data);
