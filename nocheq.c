@@ -163,6 +163,8 @@ int zend_nocheq_recv_init_handler(zend_execute_data *execute_data) {
 #endif
     }
 
+    zend_nocheq_vm_helper(execute_data, ops, param, args);
+
     ZEND_VM_NEXT();
 }
 
