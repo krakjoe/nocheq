@@ -50,6 +50,7 @@ static zend_always_inline zval* zend_vm_get_zval(
 #define ZEND_VM_OPLINE     EX(opline)
 #define ZEND_VM_USE_OPS    const zend_op_array *ops = (zend_op_array*) EX(func)
 #define ZEND_VM_USE_OPLINE const zend_op *opline = EX(opline)
+#define ZEND_VM_USE_STRICT const zend_bool strict = EX_USES_STRICT_TYPES()
 #define ZEND_VM_CONTINUE() return ZEND_USER_OPCODE_CONTINUE
 #define ZEND_VM_NEXT()    do { \
 	ZEND_VM_OPLINE = \
@@ -80,8 +81,9 @@ static zend_always_inline void zend_nocheq_vm_helper(zend_execute_data *execute_
 int zend_nocheq_recv_handler(zend_execute_data *execute_data) {
     ZEND_VM_USE_OPS;
     ZEND_VM_USE_OPLINE;
+    ZEND_VM_USE_STRICT;
 
-    if (UNEXPECTED(opline->op1.num > EX_NUM_ARGS())) {
+    if (UNEXPECTED((0 == strict) || (opline->op1.num > EX_NUM_ARGS()))) {
         if (UNEXPECTED(zend_vm_recv_handler)) {
             return zend_vm_recv_handler(execute_data);
         }
@@ -89,7 +91,7 @@ int zend_nocheq_recv_handler(zend_execute_data *execute_data) {
         return ZEND_USER_OPCODE_DISPATCH;
     }
 
-    if (EX_USES_STRICT_TYPES()) {
+    if (UNEXPECTED(1 == strict)) {
         zend_nocheq_vm_helper(execute_data, ops, EX_VAR(opline->result.var), opline->op1.num);
     }
 
@@ -99,10 +101,11 @@ int zend_nocheq_recv_handler(zend_execute_data *execute_data) {
 int zend_nocheq_recv_init_handler(zend_execute_data *execute_data) {
     ZEND_VM_USE_OPS;
     ZEND_VM_USE_OPLINE;
+    ZEND_VM_USE_STRICT;
     uint32_t args;
     zval     *param;
 
-    if (UNEXPECTED(!(ops->fn_flags & ZEND_ACC_HAS_TYPE_HINTS))) {
+    if (UNEXPECTED((0 == strict) || !(ops->fn_flags & ZEND_ACC_HAS_TYPE_HINTS))) {
         if (UNEXPECTED(zend_vm_recv_init_handler)) {
             return zend_vm_recv_init_handler(execute_data);
         }
@@ -150,7 +153,7 @@ int zend_nocheq_recv_init_handler(zend_execute_data *execute_data) {
 #endif
     }
 
-    if (EX_USES_STRICT_TYPES()) {
+    if (UNEXPECTED(1 == strict)) {
         zend_nocheq_vm_helper(execute_data, ops, param, args);
     }
 
@@ -160,9 +163,17 @@ int zend_nocheq_recv_init_handler(zend_execute_data *execute_data) {
 int zend_nocheq_recv_variadic_handler(zend_execute_data *execute_data) {
     ZEND_VM_USE_OPS;
     ZEND_VM_USE_OPLINE;
+    ZEND_VM_USE_STRICT;
     uint32_t args, count;
     zval     *params;
-    zend_bool strict = EX_USES_STRICT_TYPES();
+
+    if (UNEXPECTED(0 == strict)) {
+        if (UNEXPECTED(zend_vm_recv_variadic_handler)) {
+            return zend_vm_recv_variadic_handler(execute_data);
+        }
+
+        return ZEND_USER_OPCODE_DISPATCH;
+    }
 
     args   = opline->op1.num;
     count  = EX_NUM_ARGS();
@@ -198,13 +209,14 @@ int zend_nocheq_recv_variadic_handler(zend_execute_data *execute_data) {
 int zend_nocheq_verify_return_handler(zend_execute_data *execute_data) {
     ZEND_VM_USE_OPS;
     ZEND_VM_USE_OPLINE;
+    ZEND_VM_USE_STRICT;
 	zval *ref, *val;
     zend_arg_info *info;
 #if PHP_VERSION_ID < 80000
     zend_free_op free_op1;
 #endif
 
-    if (UNEXPECTED(opline->op1_type == IS_UNUSED)) {
+    if (UNEXPECTED((0 == strict) || (opline->op1_type == IS_UNUSED))) {
         if (UNEXPECTED(zend_vm_verify_return_handler)) {
             return zend_vm_verify_return_handler(execute_data);
         }
@@ -255,7 +267,7 @@ int zend_nocheq_verify_return_handler(zend_execute_data *execute_data) {
 		val = ref;
 	}
 
-    if (EX_USES_STRICT_TYPES()) {
+    if (strict) {
         zend_nocheq_vm_helper(execute_data, ops, val, -1);
     }
 
