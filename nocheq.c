@@ -65,7 +65,7 @@ static zend_always_inline void zend_nocheq_vm_helper(zend_execute_data *execute_
         zend_arg_info *ai =
                 &ops->arg_info[(arg == -1) ? arg : arg - 1];
 
-        if ((ZEND_TYPE_CODE(ai->type) == IS_DOUBLE) && (Z_TYPE_P(var) == IS_LONG)) {
+        if (UNEXPECTED((ZEND_TYPE_CODE(ai->type) == IS_DOUBLE) && (Z_TYPE_P(var) == IS_LONG))) {
             double dest;
 
             if (!zend_parse_arg_double_weak(var, &dest)) {
@@ -253,8 +253,6 @@ int zend_nocheq_verify_return_handler(zend_execute_data *execute_data) {
 #endif
                 BP_VAR_R);
 
-    zend_nocheq_vm_helper(execute_data, ops, val, -1);
-
 	if (opline->op1_type == IS_CONST) {
 		ZVAL_COPY(
             EX_VAR(opline->result.var), val);
@@ -285,6 +283,8 @@ int zend_nocheq_verify_return_handler(zend_execute_data *execute_data) {
 		}
 		val = ref;
 	}
+
+    zend_nocheq_vm_helper(execute_data, ops, val, -1);
 
 #if PHP_VERSION_ID < 80000
     if (free_op1) {
