@@ -286,12 +286,6 @@ int zend_nocheq_verify_return_handler(zend_execute_data *execute_data) {
 
     zend_nocheq_vm_helper(execute_data, ops, val, -1);
 
-#if PHP_VERSION_ID < 80000
-    if (free_op1) {
-        zval_ptr_dtor_nogc(free_op1);
-    }
-#endif
-
     ZEND_VM_NEXT();
 }
 
