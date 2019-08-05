@@ -91,9 +91,7 @@ int zend_nocheq_recv_handler(zend_execute_data *execute_data) {
         return ZEND_USER_OPCODE_DISPATCH;
     }
 
-    if (UNEXPECTED(1 == strict)) {
-        zend_nocheq_vm_helper(execute_data, ops, EX_VAR(opline->result.var), opline->op1.num);
-    }
+    zend_nocheq_vm_helper(execute_data, ops, EX_VAR(opline->result.var), opline->op1.num);
 
     ZEND_VM_NEXT();
 }
@@ -153,9 +151,7 @@ int zend_nocheq_recv_init_handler(zend_execute_data *execute_data) {
 #endif
     }
 
-    if (UNEXPECTED(1 == strict)) {
-        zend_nocheq_vm_helper(execute_data, ops, param, args);
-    }
+    zend_nocheq_vm_helper(execute_data, ops, param, args);
 
     ZEND_VM_NEXT();
 }
@@ -191,9 +187,7 @@ int zend_nocheq_recv_variadic_handler(zend_execute_data *execute_data) {
 		ZEND_HASH_FILL_PACKED(Z_ARRVAL_P(params)) {
 			param = EX_VAR_NUM(ops->last_var + ops->T);
 			do {
-                if (strict) {
-                    zend_nocheq_vm_helper(execute_data, ops, param, opline->op1.num);
-                }
+                zend_nocheq_vm_helper(execute_data, ops, param, opline->op1.num);
 				if (Z_OPT_REFCOUNTED_P(param)) Z_ADDREF_P(param);
 				ZEND_HASH_FILL_ADD(param);
 				param++;
@@ -267,9 +261,7 @@ int zend_nocheq_verify_return_handler(zend_execute_data *execute_data) {
 		val = ref;
 	}
 
-    if (strict) {
-        zend_nocheq_vm_helper(execute_data, ops, val, -1);
-    }
+    zend_nocheq_vm_helper(execute_data, ops, val, -1);
 
     ZEND_VM_NEXT();
 }
