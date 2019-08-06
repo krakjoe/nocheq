@@ -22,7 +22,9 @@ To install:
 
 Well tested code may have type checking disabled in production, if it is developed and tested using strict type checking: nocheq rewrites the instruction handlers for RECV and RETURN, so that any code compiled with `declare(strict_types=1);` may avoid type checking in production.
 
-Simple.
+In the simplest case (RECV) it may be possible to optimize the instruction away completely during compile, in other cases (variadic, return) we detect if we can execute an optimized instruction handler.
+
+Simple, kinda.
 
 #### Will you work on this ?
 
