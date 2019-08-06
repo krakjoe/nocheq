@@ -48,7 +48,7 @@ before_script:
   - export PATH=$HOME/bin:$PATH
   - echo "variables_order=EGPCS"                >> $HOME/.phpenv/versions/$TRAVIS_PHP_VERSION/etc/php.ini
   - echo                                        > $HOME/.phpenv/versions/$TRAVIS_PHP_VERSION/etc/conf.d/xdebug.ini
-  - echo "extension=nocheq.so"               > $HOME/.phpenv/versions/$TRAVIS_PHP_VERSION/etc/conf.d/nocheq.ini
+  - echo "zend_extension=nocheq.so"             > $HOME/.phpenv/versions/$TRAVIS_PHP_VERSION/etc/conf.d/nocheq.ini
   - echo "opcache.enable_cli=$OPCACHE"          > $HOME/.phpenv/versions/$TRAVIS_PHP_VERSION/etc/conf.d/opcache.ini
   - echo "opcache.optimization_level=0"         >> $HOME/.phpenv/versions/$TRAVIS_PHP_VERSION/etc/conf.d/opcache.ini
 

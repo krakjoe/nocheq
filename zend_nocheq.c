@@ -77,10 +77,9 @@ int zend_nocheq_recv_init_handler(zend_execute_data *execute_data) {
     ZEND_VM_USE_OPS;
     ZEND_VM_USE_OPLINE;
 
-    uint32_t args = opline->op1.num;
-    zval     *param = EX_VAR(opline->result.var);
+    if (UNEXPECTED(opline->op1.num > EX_NUM_ARGS())) {
+        zval     *param = EX_VAR(opline->result.var);
 
-    if (UNEXPECTED(args > EX_NUM_ARGS())) {
 #if PHP_VERSION_ID < 70300
         ZVAL_COPY(param, EX_CONSTANT(opline->op2));
 
@@ -285,6 +284,7 @@ void zend_nocheq_optimize(zend_op_array *ops) {
             zend_arg_info *ai;
 
             switch (opline->opcode) {
+                /* RECV is the best case, it can be optimized away completely if strict and not double */
                 case ZEND_RECV:
                     if ((ops->fn_flags & ZEND_ACC_HAS_TYPE_HINTS)) {
                         ai = &ops->arg_info[opline->op1.num-1];
@@ -296,6 +296,7 @@ void zend_nocheq_optimize(zend_op_array *ops) {
                     }
                 break;
 
+                /* Other cases will use user opcodes if strict and not double */
                 case ZEND_RECV_INIT:
                     if ((ops->fn_flags & ZEND_ACC_HAS_TYPE_HINTS)) {
                         ai = &ops->arg_info[opline->op1.num-1];
