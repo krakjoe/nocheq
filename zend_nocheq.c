@@ -36,14 +36,24 @@
 # define ZEND_NOCHEQ_EXTENSION_API
 #endif
 
-#define ZEND_NOCHEQ_RECV_INIT           ZEND_VM_LAST_OPCODE+1
-#define ZEND_NOCHEQ_RECV_VARIADIC       ZEND_VM_LAST_OPCODE+2
-#define ZEND_NOCHEQ_VERIFY_RETURN       ZEND_VM_LAST_OPCODE+3
+static int ZEND_NOCHEQ_RECV_INIT = ZEND_VM_LAST_OPCODE+1,
+           ZEND_NOCHEQ_RECV_VARIADIC = ZEND_VM_LAST_OPCODE+2,
+           ZEND_NOCHEQ_VERIFY_RETURN = ZEND_VM_LAST_OPCODE+3;
 
 static int  zend_nocheq_startup(zend_extension*);
 static void zend_nocheq_shutdown(zend_extension *);
 static void zend_nocheq_activate(void);
 static void zend_nocheq_deactivate(void);
+
+static zend_always_inline void zend_vm_register_opcode(int *opcode, int (*handler)(zend_execute_data*)) {
+    while (zend_get_user_opcode_handler(*opcode)) {
+        (*opcode)++;
+    }
+
+    ZEND_ASSERT((*opcode) < 256);
+
+    zend_set_user_opcode_handler(*opcode, handler);
+}
 
 static zend_always_inline zval* zend_vm_get_zval(
         const zend_op *opline,
@@ -213,9 +223,14 @@ int zend_nocheq_verify_return_handler(zend_execute_data *execute_data) {
 
 int zend_nocheq_startup(zend_extension *ze)
 {
-    zend_set_user_opcode_handler(ZEND_NOCHEQ_RECV_INIT,     zend_nocheq_recv_init_handler);
-    zend_set_user_opcode_handler(ZEND_NOCHEQ_RECV_VARIADIC, zend_nocheq_recv_variadic_handler);
-    zend_set_user_opcode_handler(ZEND_NOCHEQ_VERIFY_RETURN, zend_nocheq_verify_return_handler);
+    zend_vm_register_opcode(
+        &ZEND_NOCHEQ_RECV_INIT,     zend_nocheq_recv_init_handler);
+    zend_vm_register_opcode(
+        &ZEND_NOCHEQ_RECV_VARIADIC, zend_nocheq_recv_variadic_handler);
+    zend_vm_register_opcode(
+        &ZEND_NOCHEQ_VERIFY_RETURN, zend_nocheq_verify_return_handler);
+
+    ze->handle = 0;
 
     return SUCCESS;
 }
