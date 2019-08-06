@@ -59,23 +59,33 @@ static zend_always_inline zval* zend_vm_get_zval(
 } while(0)
 
 static zend_always_inline void zend_nocheq_vm_helper(zend_execute_data *execute_data, const zend_op_array *ops, zval *var, int arg) {
-    uint32_t flag = (arg == -1) ?
-        ZEND_ACC_HAS_RETURN_TYPE : ZEND_ACC_HAS_TYPE_HINTS;
+    zend_arg_info *ai;
 
-    if (UNEXPECTED(ops->fn_flags & flag)) {
-        zend_arg_info *ai =
-                &ops->arg_info[(arg == -1) ? arg : arg - 1];
-
-        if (UNEXPECTED((ZEND_TYPE_CODE(ai->type) == IS_DOUBLE) && (Z_TYPE_P(var) == IS_LONG))) {
-            double dest;
-
-            if (!zend_parse_arg_double_weak(var, &dest)) {
-                return;
-            }
-
-            ZVAL_DOUBLE(var, dest);
-        }
+    if (Z_TYPE_P(var) != IS_LONG) {
+        return;
     }
+
+    if (arg != -1) {
+        if (!(ops->fn_flags & ZEND_ACC_HAS_TYPE_HINTS)) {
+            return;
+        }
+        ai = &ops->arg_info[arg-1];
+    } else {
+        if (!(ops->fn_flags & ZEND_ACC_HAS_RETURN_TYPE)) {
+            return;
+        }
+        ai = &ops->arg_info[-1];
+    }
+
+    if (ZEND_TYPE_CODE(ai->type) != IS_DOUBLE) {
+        return;
+    }
+
+    if (!zend_parse_arg_double_weak(var, &Z_DVAL_P(var))) {
+        return;
+    }
+
+    Z_TYPE_INFO_P(var) = IS_DOUBLE;
 }
 
 int zend_nocheq_recv_handler(zend_execute_data *execute_data) {
@@ -83,7 +93,7 @@ int zend_nocheq_recv_handler(zend_execute_data *execute_data) {
     ZEND_VM_USE_OPLINE;
     ZEND_VM_USE_STRICT;
 
-    if (UNEXPECTED((0 == strict) || (opline->op1.num > EX_NUM_ARGS()))) {
+    if (UNEXPECTED((opline->op1.num > EX_NUM_ARGS()))) {
         if (UNEXPECTED(zend_vm_recv_handler)) {
             return zend_vm_recv_handler(execute_data);
         }
@@ -91,7 +101,9 @@ int zend_nocheq_recv_handler(zend_execute_data *execute_data) {
         return ZEND_USER_OPCODE_DISPATCH;
     }
 
-    zend_nocheq_vm_helper(execute_data, ops, EX_VAR(opline->result.var), opline->op1.num);
+    if (strict ) {
+        zend_nocheq_vm_helper(execute_data, ops, EX_VAR(opline->result.var), opline->op1.num);
+    }
 
     ZEND_VM_NEXT();
 }
@@ -102,13 +114,6 @@ int zend_nocheq_recv_init_handler(zend_execute_data *execute_data) {
     ZEND_VM_USE_STRICT;
     uint32_t args;
     zval     *param;
-
-    if (UNEXPECTED((0 == strict) || !(ops->fn_flags & ZEND_ACC_HAS_TYPE_HINTS))) {
-        if (UNEXPECTED(zend_vm_recv_init_handler)) {
-            return zend_vm_recv_init_handler(execute_data);
-        }
-        return ZEND_USER_OPCODE_DISPATCH;
-    }
 
     args  = opline->op1.num;
     param = EX_VAR(opline->result.var);
@@ -151,7 +156,9 @@ int zend_nocheq_recv_init_handler(zend_execute_data *execute_data) {
 #endif
     }
 
-    zend_nocheq_vm_helper(execute_data, ops, param, args);
+    if (strict) {
+        zend_nocheq_vm_helper(execute_data, ops, param, args);
+    }
 
     ZEND_VM_NEXT();
 }
@@ -162,14 +169,6 @@ int zend_nocheq_recv_variadic_handler(zend_execute_data *execute_data) {
     ZEND_VM_USE_STRICT;
     uint32_t args, count;
     zval     *params;
-
-    if (UNEXPECTED(0 == strict)) {
-        if (UNEXPECTED(zend_vm_recv_variadic_handler)) {
-            return zend_vm_recv_variadic_handler(execute_data);
-        }
-
-        return ZEND_USER_OPCODE_DISPATCH;
-    }
 
     args   = opline->op1.num;
     count  = EX_NUM_ARGS();
@@ -187,7 +186,9 @@ int zend_nocheq_recv_variadic_handler(zend_execute_data *execute_data) {
         ZEND_HASH_FILL_PACKED(Z_ARRVAL_P(params)) {
             param = EX_VAR_NUM(ops->last_var + ops->T);
             do {
-                zend_nocheq_vm_helper(execute_data, ops, param, opline->op1.num);
+                if (strict) {
+                    zend_nocheq_vm_helper(execute_data, ops, param, opline->op1.num);
+                }
                 if (Z_OPT_REFCOUNTED_P(param)) Z_ADDREF_P(param);
                 ZEND_HASH_FILL_ADD(param);
                 param++;
@@ -210,7 +211,7 @@ int zend_nocheq_verify_return_handler(zend_execute_data *execute_data) {
     zend_free_op free_op1;
 #endif
 
-    if (UNEXPECTED((0 == strict) || (opline->op1_type == IS_UNUSED))) {
+    if (UNEXPECTED((opline->op1_type == IS_UNUSED))) {
         if (UNEXPECTED(zend_vm_verify_return_handler)) {
             return zend_vm_verify_return_handler(execute_data);
         }
@@ -261,7 +262,9 @@ int zend_nocheq_verify_return_handler(zend_execute_data *execute_data) {
         val = ref;
     }
 
-    zend_nocheq_vm_helper(execute_data, ops, val, -1);
+    if (strict) {
+        zend_nocheq_vm_helper(execute_data, ops, val, -1);
+    }
 
     ZEND_VM_NEXT();
 }
