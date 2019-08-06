@@ -50,7 +50,8 @@ static zend_always_inline zval* zend_vm_get_zval(
 #define ZEND_VM_OPLINE     EX(opline)
 #define ZEND_VM_USE_OPS    const zend_op_array *ops = (zend_op_array*) EX(func)
 #define ZEND_VM_USE_OPLINE const zend_op *opline = EX(opline)
-#define ZEND_VM_USE_STRICT const zend_bool strict = EX_USES_STRICT_TYPES()
+#define ZEND_VM_USE_STRICT const zend_bool strict = \
+        ((ops->fn_flags & ZEND_ACC_STRICT_TYPES) != 0)
 #define ZEND_VM_CONTINUE() return ZEND_USER_OPCODE_CONTINUE
 #define ZEND_VM_NEXT()    do { \
     ZEND_VM_OPLINE = \
