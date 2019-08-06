@@ -7,5 +7,5 @@ PHP_ARG_ENABLE([nocheq],
   [no])
 
 if test "$PHP_NOCHEQ" != "no"; then
-  PHP_NEW_EXTENSION(nocheq, nocheq.c, $ext_shared)
+  PHP_NEW_EXTENSION(nocheq, zend_nocheq.c, $ext_shared,,-DZEND_ENABLE_STATIC_TSRMLS_CACHE=1,,yes)
 fi

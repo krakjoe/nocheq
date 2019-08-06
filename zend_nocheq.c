@@ -15,19 +15,35 @@
   | Author: krakjoe                                                      |
   +----------------------------------------------------------------------+
  */
+#ifndef ZEND_NOCHEQ
+#define ZEND_NOCHEQ
+
 #ifdef HAVE_CONFIG_H
 # include "config.h"
 #endif
 
-#include "php.h"
-#include "ext/standard/info.h"
-#include "php_nocheq.h"
+#include "zend_nocheq.h"
 
-static user_opcode_handler_t zend_vm_recv_handler;
-static user_opcode_handler_t zend_vm_recv_init_handler;
-static user_opcode_handler_t zend_vm_recv_variadic_handler;
+#define ZEND_NOCHEQ_EXTNAME   "NoCheq"
+#define ZEND_NOCHEQ_VERSION   "0.0.1-dev"
+#define ZEND_NOCHEQ_AUTHOR    "krakjoe"
+#define ZEND_NOCHEQ_URL       "https://github.com/krakjoe/nocheq"
+#define ZEND_NOCHEQ_COPYRIGHT "Copyright (c) 2019"
 
-static user_opcode_handler_t zend_vm_verify_return_handler;
+#if defined(__GNUC__) && __GNUC__ >= 4
+# define ZEND_NOCHEQ_EXTENSION_API __attribute__ ((visibility("default")))
+#else
+# define ZEND_NOCHEQ_EXTENSION_API
+#endif
+
+#define ZEND_NOCHEQ_RECV_INIT           ZEND_VM_LAST_OPCODE+1
+#define ZEND_NOCHEQ_RECV_VARIADIC       ZEND_VM_LAST_OPCODE+2
+#define ZEND_NOCHEQ_VERIFY_RETURN       ZEND_VM_LAST_OPCODE+3
+
+static int  zend_nocheq_startup(zend_extension*);
+static void zend_nocheq_shutdown(zend_extension *);
+static void zend_nocheq_activate(void);
+static void zend_nocheq_deactivate(void);
 
 static zend_always_inline zval* zend_vm_get_zval(
         const zend_op *opline,
@@ -50,8 +66,6 @@ static zend_always_inline zval* zend_vm_get_zval(
 #define ZEND_VM_OPLINE     EX(opline)
 #define ZEND_VM_USE_OPS    const zend_op_array *ops = (zend_op_array*) EX(func)
 #define ZEND_VM_USE_OPLINE const zend_op *opline = EX(opline)
-#define ZEND_VM_USE_STRICT const zend_bool strict = \
-        ((ops->fn_flags & ZEND_ACC_STRICT_TYPES) != 0)
 #define ZEND_VM_CONTINUE() return ZEND_USER_OPCODE_CONTINUE
 #define ZEND_VM_NEXT()    do { \
     ZEND_VM_OPLINE = \
@@ -59,74 +73,14 @@ static zend_always_inline zval* zend_vm_get_zval(
     ZEND_VM_CONTINUE(); \
 } while(0)
 
-static zend_always_inline void zend_nocheq_vm_helper(zend_execute_data *execute_data, const zend_op_array *ops, zval *var, int arg) {
-    zend_arg_info *ai;
-
-    if (EXPECTED(Z_TYPE_P(var) != IS_LONG)) {
-        return;
-    }
-
-    if (arg != -1) {
-        if (UNEXPECTED(!(ops->fn_flags & ZEND_ACC_HAS_TYPE_HINTS))) {
-            return;
-        }
-        ai = &ops->arg_info[arg-1];
-    } else {
-        if (UNEXPECTED(!(ops->fn_flags & ZEND_ACC_HAS_RETURN_TYPE))) {
-            return;
-        }
-        ai = &ops->arg_info[-1];
-    }
-
-    if (EXPECTED(ZEND_TYPE_CODE(ai->type) != IS_DOUBLE)) {
-        return;
-    }
-
-    if (UNEXPECTED(!zend_parse_arg_double_weak(var, &Z_DVAL_P(var)))) {
-        return;
-    }
-
-    Z_TYPE_INFO_P(var) = IS_DOUBLE;
-}
-
-int zend_nocheq_recv_handler(zend_execute_data *execute_data) {
-    ZEND_VM_USE_OPS;
-    ZEND_VM_USE_OPLINE;
-    ZEND_VM_USE_STRICT;
-
-    if (UNEXPECTED((0 == strict) || (opline->op1.num > EX_NUM_ARGS()))) {
-        if (UNEXPECTED(zend_vm_recv_handler)) {
-            return zend_vm_recv_handler(execute_data);
-        }
-
-        return ZEND_USER_OPCODE_DISPATCH;
-    }
-
-    if (UNEXPECTED(1 == strict)) {
-        zend_nocheq_vm_helper(execute_data, ops, EX_VAR(opline->result.var), opline->op1.num);
-    }
-
-    ZEND_VM_NEXT();
-}
-
 int zend_nocheq_recv_init_handler(zend_execute_data *execute_data) {
     ZEND_VM_USE_OPS;
     ZEND_VM_USE_OPLINE;
-    ZEND_VM_USE_STRICT;
-    uint32_t args;
-    zval     *param;
 
-    if (UNEXPECTED((0 == strict) || !(ops->fn_flags & ZEND_ACC_HAS_TYPE_HINTS))) {
-        if (UNEXPECTED(zend_vm_recv_init_handler)) {
-            return zend_vm_recv_init_handler(execute_data);
-        }
-        return ZEND_USER_OPCODE_DISPATCH;
-    }
+    uint32_t args = opline->op1.num;
+    zval     *param = EX_VAR(opline->result.var);
 
-    args  = opline->op1.num;
-    param = EX_VAR(opline->result.var);
-
-    if (args > EX_NUM_ARGS()) {
+    if (UNEXPECTED(args > EX_NUM_ARGS())) {
 #if PHP_VERSION_ID < 70300
         ZVAL_COPY(param, EX_CONSTANT(opline->op2));
 
@@ -164,33 +118,17 @@ int zend_nocheq_recv_init_handler(zend_execute_data *execute_data) {
 #endif
     }
 
-    if (UNEXPECTED(1 == strict)) {
-        zend_nocheq_vm_helper(execute_data, ops, param, args);
-    }
-
     ZEND_VM_NEXT();
 }
 
 int zend_nocheq_recv_variadic_handler(zend_execute_data *execute_data) {
     ZEND_VM_USE_OPS;
     ZEND_VM_USE_OPLINE;
-    ZEND_VM_USE_STRICT;
-    uint32_t args, count;
-    zval     *params;
+    uint32_t args   = opline->op1.num,
+             count  = EX_NUM_ARGS();
+    zval    *params = EX_VAR(opline->result.var);
 
-    if (UNEXPECTED(0 == strict)) {
-        if (UNEXPECTED(zend_vm_recv_variadic_handler)) {
-            return zend_vm_recv_variadic_handler(execute_data);
-        }
-
-        return ZEND_USER_OPCODE_DISPATCH;
-    }
-
-    args   = opline->op1.num;
-    count  = EX_NUM_ARGS();
-    params = EX_VAR(opline->result.var);
-
-    if (args <= count) {
+    if (UNEXPECTED(args <= count)) {
         zval *param;
 
         array_init_size(params, count - args + 1);
@@ -202,9 +140,6 @@ int zend_nocheq_recv_variadic_handler(zend_execute_data *execute_data) {
         ZEND_HASH_FILL_PACKED(Z_ARRVAL_P(params)) {
             param = EX_VAR_NUM(ops->last_var + ops->T);
             do {
-                if (1 == strict) {
-                    zend_nocheq_vm_helper(execute_data, ops, param, opline->op1.num);
-                }
                 if (Z_OPT_REFCOUNTED_P(param)) Z_ADDREF_P(param);
                 ZEND_HASH_FILL_ADD(param);
                 param++;
@@ -220,18 +155,14 @@ int zend_nocheq_recv_variadic_handler(zend_execute_data *execute_data) {
 int zend_nocheq_verify_return_handler(zend_execute_data *execute_data) {
     ZEND_VM_USE_OPS;
     ZEND_VM_USE_OPLINE;
-    ZEND_VM_USE_STRICT;
     zval *ref, *val;
     zend_arg_info *info;
 #if PHP_VERSION_ID < 80000
     zend_free_op free_op1;
 #endif
 
-    if (UNEXPECTED((0 == strict) || (opline->op1_type == IS_UNUSED))) {
-        if (UNEXPECTED(zend_vm_verify_return_handler)) {
-            return zend_vm_verify_return_handler(execute_data);
-        }
-        return ZEND_USER_OPCODE_DISPATCH;
+    if (UNEXPECTED((opline->op1_type == IS_UNUSED))) {
+        return ZEND_USER_OPCODE_DISPATCH_TO | ZEND_VERIFY_RETURN_TYPE;
     }
 
     info = ops->arg_info - 1;
@@ -278,110 +209,160 @@ int zend_nocheq_verify_return_handler(zend_execute_data *execute_data) {
         val = ref;
     }
 
-    if (1 == strict) {
-        zend_nocheq_vm_helper(execute_data, ops, val, -1);
-    }
-
     ZEND_VM_NEXT();
 }
 
-/* {{{ PHP_MSHUTDOWN_FUNCTION
- */
-PHP_MINIT_FUNCTION(nocheq)
+int zend_nocheq_startup(zend_extension *ze)
 {
-    zend_vm_recv_handler =
-        zend_get_user_opcode_handler(ZEND_RECV);
-    zend_set_user_opcode_handler(
-        ZEND_RECV, zend_nocheq_recv_handler);
-
-    zend_vm_recv_init_handler =
-        zend_get_user_opcode_handler(ZEND_RECV_INIT);
-    zend_set_user_opcode_handler(
-        ZEND_RECV_INIT, zend_nocheq_recv_init_handler);
-
-    zend_vm_recv_variadic_handler =
-        zend_get_user_opcode_handler(ZEND_RECV_VARIADIC);
-    zend_set_user_opcode_handler(
-        ZEND_RECV_VARIADIC, zend_nocheq_recv_variadic_handler);
-
-    zend_vm_verify_return_handler =
-        zend_get_user_opcode_handler(ZEND_VERIFY_RETURN_TYPE);
-    zend_set_user_opcode_handler(
-        ZEND_VERIFY_RETURN_TYPE, zend_nocheq_verify_return_handler);
+    zend_set_user_opcode_handler(ZEND_NOCHEQ_RECV_INIT,     zend_nocheq_recv_init_handler);
+    zend_set_user_opcode_handler(ZEND_NOCHEQ_RECV_VARIADIC, zend_nocheq_recv_variadic_handler);
+    zend_set_user_opcode_handler(ZEND_NOCHEQ_VERIFY_RETURN, zend_nocheq_verify_return_handler);
 
     return SUCCESS;
 }
-/* }}} */
 
-/* {{{ PHP_MSHUTDOWN_FUNCTION
- */
-PHP_MSHUTDOWN_FUNCTION(nocheq)
+void zend_nocheq_shutdown(zend_extension *ze)
 {
-    zend_set_user_opcode_handler(
-        ZEND_RECV, zend_vm_recv_handler);
-
-    zend_set_user_opcode_handler(
-        ZEND_RECV_INIT, zend_vm_recv_init_handler);
-
-    zend_set_user_opcode_handler(
-        ZEND_RECV_VARIADIC, zend_vm_recv_variadic_handler);
-
-    zend_set_user_opcode_handler(
-        ZEND_VERIFY_RETURN_TYPE, zend_vm_verify_return_handler);
-
-    return SUCCESS;
+    zend_set_user_opcode_handler(ZEND_NOCHEQ_RECV_INIT,     NULL);
+    zend_set_user_opcode_handler(ZEND_NOCHEQ_RECV_VARIADIC, NULL);
+    zend_set_user_opcode_handler(ZEND_NOCHEQ_VERIFY_RETURN, NULL);
 }
-/* }}} */
 
-/* {{{ PHP_RINIT_FUNCTION
- */
-PHP_RINIT_FUNCTION(nocheq)
+void zend_nocheq_activate(void)
 {
 #if defined(ZTS) && defined(COMPILE_DL_NOCHEQ)
     ZEND_TSRMLS_CACHE_UPDATE();
 #endif
 
-    return SUCCESS;
-}
-/* }}} */
+    if (INI_INT("opcache.optimization_level")) {
+        zend_string *optimizer = zend_string_init(
+	        ZEND_STRL("opcache.optimization_level"), 1);
+        zend_long level = INI_INT("opcache.optimization_level");
+        zend_string *value;
 
-/* {{{ PHP_RSHUTDOWN_FUNCTION
- */
-PHP_RSHUTDOWN_FUNCTION(nocheq)
+        /* disable incompatible passes */
+        level &= ~(1<<0);
+        level &= ~(1<<3);
+        level &= ~(1<<5);
+
+        value = zend_strpprintf(0, "0x%08X", (unsigned int) level);
+
+        zend_alter_ini_entry(optimizer, value,
+	        ZEND_INI_SYSTEM, ZEND_INI_STAGE_ACTIVATE);
+
+        zend_string_release(optimizer);
+        zend_string_release(value);
+    }
+}
+
+void zend_nocheq_deactivate(void)
 {
-    return SUCCESS;
-}
-/* }}} */
 
-/* {{{ PHP_MINFO_FUNCTION
- */
-PHP_MINFO_FUNCTION(nocheq)
-{
-    php_info_print_table_start();
-    php_info_print_table_header(2, "nocheq support", "enabled");
-    php_info_print_table_end();
 }
-/* }}} */
 
-/* {{{ nocheq_module_entry
- */
-zend_module_entry nocheq_module_entry = {
-    STANDARD_MODULE_HEADER,
-    "nocheq",
-    NULL,
-    PHP_MINIT(nocheq),
-    PHP_MSHUTDOWN(nocheq),
-    PHP_RINIT(nocheq),
-    PHP_RSHUTDOWN(nocheq),
-    PHP_MINFO(nocheq),
-    PHP_NOCHEQ_VERSION,
-    STANDARD_MODULE_PROPERTIES
+void zend_nocheq_optimize(zend_op_array *ops) {
+    if (!(ops->fn_flags & ZEND_ACC_HAS_TYPE_HINTS) &&
+        !(ops->fn_flags & ZEND_ACC_HAS_RETURN_TYPE)) {
+        /* no type information */
+        return;
+    }
+
+    if (!(ops->fn_flags & ZEND_ACC_STRICT_TYPES)) {
+        /* not strict code */
+        return;
+    }
+
+    if (!ops->function_name) {
+        /* a file */
+        return;
+    }
+
+    {
+        zend_op *opline = ops->opcodes,
+                *end    = opline + ops->last;
+
+        while (opline < end) {
+            zend_arg_info *ai;
+
+            switch (opline->opcode) {
+                case ZEND_RECV:
+                    if ((ops->fn_flags & ZEND_ACC_HAS_TYPE_HINTS)) {
+                        ai = &ops->arg_info[opline->op1.num-1];
+
+                        if (ZEND_TYPE_IS_SET(ai->type) &&
+                            ZEND_TYPE_CODE(ai->type) != IS_DOUBLE) {
+                            opline->opcode  = ZEND_NOP;
+                        }
+                    }
+                break;
+
+                case ZEND_RECV_INIT:
+                    if ((ops->fn_flags & ZEND_ACC_HAS_TYPE_HINTS)) {
+                        ai = &ops->arg_info[opline->op1.num-1];
+
+                        if (ZEND_TYPE_IS_SET(ai->type) &&
+                            ZEND_TYPE_CODE(ai->type) != IS_DOUBLE) {
+                            opline->opcode = ZEND_NOCHEQ_RECV_INIT;
+                            opline->handler = zend_nocheq_recv_init_handler;
+                        }
+                    }
+                break;
+
+                case ZEND_RECV_VARIADIC:
+                    if ((ops->fn_flags & ZEND_ACC_HAS_TYPE_HINTS)) {
+                        ai = &ops->arg_info[opline->op1.num-1];
+
+                        if (ZEND_TYPE_IS_SET(ai->type) &&
+                            ZEND_TYPE_CODE(ai->type) != IS_DOUBLE) {
+                            opline->opcode = ZEND_NOCHEQ_RECV_VARIADIC;
+                            opline->handler = zend_nocheq_recv_variadic_handler;
+                        }
+                    }
+                break;
+
+                case ZEND_VERIFY_RETURN_TYPE:
+                    ai = ops->arg_info - 1;
+
+                    if (ZEND_TYPE_IS_SET(ai->type) &&
+                        ZEND_TYPE_CODE(ai->type) != IS_DOUBLE) {
+                        opline->opcode = ZEND_NOCHEQ_VERIFY_RETURN;
+                        opline->handler = zend_nocheq_verify_return_handler;
+                    }
+                break;
+            }
+
+            opline++;
+        }
+    }
+}
+
+ZEND_NOCHEQ_EXTENSION_API zend_extension_version_info extension_version_info = {
+    ZEND_EXTENSION_API_NO,
+    ZEND_EXTENSION_BUILD_ID
 };
-/* }}} */
 
-#ifdef COMPILE_DL_NOCHEQ
-# ifdef ZTS
-ZEND_TSRMLS_CACHE_DEFINE()
-# endif
-ZEND_GET_MODULE(nocheq)
+ZEND_NOCHEQ_EXTENSION_API zend_extension zend_extension_entry = {
+    ZEND_NOCHEQ_EXTNAME,
+    ZEND_NOCHEQ_VERSION,
+    ZEND_NOCHEQ_AUTHOR,
+    ZEND_NOCHEQ_URL,
+    ZEND_NOCHEQ_COPYRIGHT,
+    zend_nocheq_startup,
+    zend_nocheq_shutdown,
+    zend_nocheq_activate,
+    zend_nocheq_deactivate,
+    NULL,
+    zend_nocheq_optimize,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    STANDARD_ZEND_EXTENSION_PROPERTIES
+};
+
+#if defined(ZTS) && defined(COMPILE_DL_NOCHEQ)
+    ZEND_TSRMLS_CACHE_DEFINE()
+#endif
+
 #endif

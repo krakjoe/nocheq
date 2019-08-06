@@ -16,13 +16,16 @@
   +----------------------------------------------------------------------+
  */
 
-#ifndef PHP_NOCHEQ_H
-# define PHP_NOCHEQ_H
+#ifndef ZEND_NOCHEQ_H
+# define ZEND_NOCHEQ_H
 
-extern zend_module_entry nocheq_module_entry;
-# define phpext_nocheq_ptr &nocheq_module_entry
+#include "zend.h"
+#include "zend_API.h"
+#include "zend_compile.h"
+#include "zend_extensions.h"
+#include "zend_ini.h"
 
-# define PHP_NOCHEQ_VERSION "0.0.1-dev"
+#include "main/php_version.h"
 
 # if defined(ZTS) && defined(COMPILE_DL_NOCHEQ)
 ZEND_TSRMLS_CACHE_EXTERN()

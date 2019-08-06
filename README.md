@@ -16,7 +16,7 @@ To build:
 
 To install:
 
-    extension=nocheq.so
+    zend_extension=nocheq.so
 
 ### How it Works
 
