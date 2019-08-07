@@ -4,8 +4,6 @@ This is an experiment, in response to:
 
     https://en.reddit.com/r/PHP/comments/cl2p1z/something_to_consider_what_about_disabling/
 
-I don't know what kind of performance difference this will have for your code, but if it's remarkable then start opening issues and suggesting improvements to this idea.
-
 ## install nocheq
 
 To build:
@@ -20,11 +18,19 @@ To install:
 
 ### How it Works
 
-Well tested code may have type checking disabled in production, if it is developed and tested using strict type checking: nocheq rewrites the instruction handlers for RECV and RETURN, so that any code compiled with `declare(strict_types=1);` may avoid type checking in production.
+Well tested code may have type the majority of type checking disabled in production, if it is developed and tested using strict type checking.
 
-In the simplest case (RECV) it may be possible to optimize the instruction away completely during compile, in other cases (variadic, return) we detect if we can execute an optimized instruction handler.
+First nocheq registers new optimized versions of `RECV_INIT` (param with default value), and `RECV_VARIADIC`, leaving the original handlers unmodified.
+
+Upon construction of every op array, Zend allows nocheq to scan the op array and remove avoidable `RECV` and `VERIFY_RETURN` instructions, nocheq goes on to detect if any `RECV_INIT` or `RECV_VARIADIC` instruction may be replaced by the optimized version.
+
+In strict mode, PHP has special behaviour for `double`, which nocheq preserves, such that your code will behave exactly the same with and without nocheq loaded.
 
 Simple, kinda.
+
+### Is this actually going to improve performance ?
+
+I don't know: This code has been rewritten and benchmarked several times such that on a real world test suite (php-code-coverage), nocheq will achieve between a 10% and 15% increase in performance.
 
 #### Will you work on this ?
 

@@ -37,8 +37,7 @@
 #endif
 
 static int ZEND_NOCHEQ_RECV_INIT = ZEND_VM_LAST_OPCODE+1,
-           ZEND_NOCHEQ_RECV_VARIADIC = ZEND_VM_LAST_OPCODE+2,
-           ZEND_NOCHEQ_VERIFY_RETURN = ZEND_VM_LAST_OPCODE+3;
+           ZEND_NOCHEQ_RECV_VARIADIC = ZEND_VM_LAST_OPCODE+2;
 
 static int  zend_nocheq_startup(zend_extension*);
 static void zend_nocheq_shutdown(zend_extension *);
@@ -161,74 +160,12 @@ int zend_nocheq_recv_variadic_handler(zend_execute_data *execute_data) {
     ZEND_VM_NEXT();
 }
 
-int zend_nocheq_verify_return_handler(zend_execute_data *execute_data) {
-    ZEND_VM_USE_OPS;
-    ZEND_VM_USE_OPLINE;
-    zval *ref, *val;
-    zend_arg_info *info;
-#if PHP_VERSION_ID < 80000
-    zend_free_op free_op1;
-#endif
-
-    if (UNEXPECTED((opline->op1_type == IS_UNUSED))) {
-        return ZEND_USER_OPCODE_DISPATCH_TO | ZEND_VERIFY_RETURN_TYPE;
-    }
-
-    info = ops->arg_info - 1;
-    ref =
-        val =
-            zend_vm_get_zval(
-                opline,
-                opline->op1_type,
-                &opline->op1,
-                execute_data,
-#if PHP_VERSION_ID < 80000
-                &free_op1,
-#endif
-                BP_VAR_R);
-
-    if (opline->op1_type == IS_CONST) {
-        ZVAL_COPY(
-            EX_VAR(opline->result.var), val);
-        ref =
-            val =
-                EX_VAR(opline->result.var);
-    } else if (opline->op1_type == IS_VAR) {
-        if (UNEXPECTED(Z_TYPE_P(val) == IS_INDIRECT)) {
-            val = Z_INDIRECT_P(val);
-        }
-        ZVAL_DEREF(val);
-    } else if (opline->op1_type == IS_CV) {
-        ZVAL_DEREF(val);
-    }
-
-    if (UNEXPECTED(!ZEND_TYPE_IS_CLASS(info->type)
-        && ZEND_TYPE_CODE(info->type) != IS_CALLABLE
-        && ZEND_TYPE_CODE(info->type) != IS_ITERABLE
-        && !ZEND_SAME_FAKE_TYPE(ZEND_TYPE_CODE(info->type), Z_TYPE_P(val))
-        && !(ops->fn_flags & ZEND_ACC_RETURN_REFERENCE)
-        && ref != val)
-    ) {
-        if (Z_REFCOUNT_P(ref) == 1) {
-            ZVAL_UNREF(ref);
-        } else {
-            Z_DELREF_P(ref);
-            ZVAL_COPY(ref, val);
-        }
-        val = ref;
-    }
-
-    ZEND_VM_NEXT();
-}
-
 int zend_nocheq_startup(zend_extension *ze)
 {
     zend_vm_register_opcode(
         &ZEND_NOCHEQ_RECV_INIT,     zend_nocheq_recv_init_handler);
     zend_vm_register_opcode(
         &ZEND_NOCHEQ_RECV_VARIADIC, zend_nocheq_recv_variadic_handler);
-    zend_vm_register_opcode(
-        &ZEND_NOCHEQ_VERIFY_RETURN, zend_nocheq_verify_return_handler);
 
     ze->handle = 0;
 
@@ -239,7 +176,6 @@ void zend_nocheq_shutdown(zend_extension *ze)
 {
     zend_set_user_opcode_handler(ZEND_NOCHEQ_RECV_INIT,     NULL);
     zend_set_user_opcode_handler(ZEND_NOCHEQ_RECV_VARIADIC, NULL);
-    zend_set_user_opcode_handler(ZEND_NOCHEQ_VERIFY_RETURN, NULL);
 }
 
 void zend_nocheq_activate(void)
@@ -299,7 +235,6 @@ void zend_nocheq_optimize(zend_op_array *ops) {
             zend_arg_info *ai;
 
             switch (opline->opcode) {
-                /* RECV is the best case, it can be optimized away completely if strict and not double */
                 case ZEND_RECV:
                     if ((ops->fn_flags & ZEND_ACC_HAS_TYPE_HINTS)) {
                         ai = &ops->arg_info[opline->op1.num-1];
@@ -311,7 +246,6 @@ void zend_nocheq_optimize(zend_op_array *ops) {
                     }
                 break;
 
-                /* Other cases will use user opcodes if strict and not double */
                 case ZEND_RECV_INIT:
                     if ((ops->fn_flags & ZEND_ACC_HAS_TYPE_HINTS)) {
                         ai = &ops->arg_info[opline->op1.num-1];
@@ -341,8 +275,7 @@ void zend_nocheq_optimize(zend_op_array *ops) {
 
                     if (ZEND_TYPE_IS_SET(ai->type) &&
                         ZEND_TYPE_CODE(ai->type) != IS_DOUBLE) {
-                        opline->opcode = ZEND_NOCHEQ_VERIFY_RETURN;
-                        opline->handler = zend_nocheq_verify_return_handler;
+                        opline->opcode = ZEND_NOP;
                     }
                 break;
             }
